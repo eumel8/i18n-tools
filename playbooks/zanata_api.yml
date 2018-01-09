@@ -1,0 +1,39 @@
+---
+# Ansible playbook to play with zanata API
+# https://zanata.ci.cloudbees.com/job/zanata-api-site/site/zanata-common-api/rest-api-docs/resource_ProjectsResource.html
+#
+- hosts: localhost
+  gather_facts: "no"
+  vars:
+    translationserver: "https://translate.openstack.org"
+
+  tasks:
+    - name: get project list
+      uri:
+        url: "{{ translationserver }}/rest/projects"
+        method: GET
+        return_content: yes
+        validate_certs: no
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+      register: api
+
+    - debug:
+        msg: "{{ api.json|json_query('[].name') }}"
+
+    - name: get project details
+      uri:
+        url: "{{ translationserver }}/rest/projects/p/{{ item }}"
+        method: GET
+        return_content: yes
+        validate_certs: no
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+      with_items: "{{ api.json|json_query('[].name') }}"
+      ignore_errors: yes
+      register: projects
+
+    - debug:
+        msg: "{{ (projects)|json_query('results[].json.[id,iterations[].id]') }}"

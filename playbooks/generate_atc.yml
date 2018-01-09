@@ -1,0 +1,67 @@
+---
+# Ansible playbook to generate extra-atc snippets for projects.yaml in
+# governance repo.
+# Requires 3 source files
+# - userstatsfile: generated output from zanata_stats.py
+# - userinfofile: generated output from zanata_userinfo.py
+# - the current projects.yaml file
+#
+# minimum translation count is to configure (default 300 words/30
+# phrases)
+#
+# Old extra-atc list will be reviewed and refreshed with new data
+# The output can be found in /tmp/atc.stats
+- hosts: localhost
+  gather_facts: "no"
+  vars:
+    userstatsfile: "zanata_stats_output.csv"
+    userinfofile: "zanata_userinfo_output.csv"
+    translatecount: 30
+  vars_files:
+    - "../../../governance/reference/projects.yaml"
+
+  tasks:
+    - name: create work dir
+      file:
+        path: /tmp/atc.output
+        state: directory
+
+    - name: read old atc list
+      vars:
+        extraatcs: "{{ I18n['extra-atcs'] }}"
+        useremail: "{{ item.email }}"
+        username: "{{ item.name }}"
+        usercomment: "{{ item.comment }}"
+        userexpires: "{{ item['expires-in'] }}"
+        expiredate: "28 {{ userexpires[:3] }}{{ userexpires[-5:] }}"
+        udateuser: "{{lookup('pipe','LANG=en date -d \"' + expiredate + '\" \"+%s\"')}}"
+        udatecur: "{{lookup('pipe','LANG=en date -d \"+1 month\" \"+%s\"') }}"
+      template:
+        src: atc.json.j2
+        dest: "/tmp/atc.output/user.{{ usercomment.split(' ')[0] }}"
+      when: udateuser|int > udatecur|int
+      with_items:
+        - "{{ extraatcs }}"
+
+    - name: read user stats
+      vars:
+        userdata: "{{ item.split(',') }}"
+        useremail: "{{ lookup('csvfile', userdata[0] + ' file=' + userinfofile + ' delimiter=, col=4') }}"
+        username: "{{ lookup('csvfile', userdata[0] + ' file=' + userinfofile + ' delimiter=, col=3') }}"
+        userlang: "{{ lookup('csvfile', userdata[0] + ' file=' + userinfofile + ' delimiter=, col=1') }}"
+        usercomment: "{{ userdata[0] }} ({{ userlang }})"
+        userexpires: "{{lookup('pipe','LANG=en date \"+%B %Y\" -d \"+1 year\"')}}"
+      template:
+        src: atc.json.j2
+        dest: "/tmp/atc.output/user.{{ userdata[0] }}"
+        force: "yes"
+      with_lines: cat "{{ userstatsfile }}"
+      when: userdata[4]|int + userdata[9]|int > translatecount
+
+    - name: create stats file
+      shell: cat /tmp/atc.output/user.* > /tmp/atc.stats
+
+    - name: delete work dir
+      file:
+        path: /tmp/atc.output
+        state: absent
