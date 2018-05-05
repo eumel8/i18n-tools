@@ -37,3 +37,21 @@
 
     - debug:
         msg: "{{ (projects)|json_query('results[].json.[id,iterations[].id]') }}"
+
+#    - name: post tm content
+#      uri:
+#        url: "{{ translationserver }}/rest/tm/TM1"
+#        method: POST
+#        return_content: yes
+#        validate_certs: no
+#        headers:
+#          Content-Type: "application/xml"
+#          Accept: "application/xml"
+#          X-Auth-User: "admin"
+#          X-Auth-Token: "cc8493e637f9f2c161d89bb3fb776783"
+#        body_format: raw
+#        body: "{{ lookup('file', 'tmx-de.xml') }}"
+#      register: api
+#
+#    - debug:
+#        msg: "{{ api }}"
